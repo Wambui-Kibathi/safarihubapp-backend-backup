@@ -1,0 +1,1 @@
+# App configuration (dev, prod, db, JWT, Stripe, PayPal)
