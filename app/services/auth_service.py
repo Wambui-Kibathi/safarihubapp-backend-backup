@@ -1,1 +1,0 @@
-# Login, register, JWT token generation

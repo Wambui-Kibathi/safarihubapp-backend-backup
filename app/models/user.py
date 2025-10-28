@@ -1,1 +1,0 @@
-# Traveler & Guide user models

@@ -1,1 +1,0 @@
-# Stripe, PayPal, M-PESA integration

@@ -1,1 +1,0 @@
-# /payment/mpesa, /payment/paypal, /payment/card

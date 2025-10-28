@@ -1,1 +1,0 @@
-# Initialize extensions: db, jwt, migrate, cors

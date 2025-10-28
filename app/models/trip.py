@@ -1,1 +1,0 @@
-# Trip/Adventure model
