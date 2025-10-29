@@ -29,5 +29,5 @@ class User(db.Model):
             "full_name": self.full_name,
             "email": self.email,
             "role": self.role,
-            "profile_image": self.profile_image
+            "profile_image_url": self.profile_image_url 
         }
