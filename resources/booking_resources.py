@@ -170,7 +170,7 @@ class BookingDetail(Resource):
             return {'error': f'Failed to fetch booking: {str(e)}'}, 500
 
     @token_required
-    def put(self, user, booking_id):
+    def patch(self, user, booking_id):
         try:
             booking = Booking.query.get(booking_id)
             if not booking:

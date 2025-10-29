@@ -185,7 +185,7 @@ class PaymentDetail(Resource):
             return {'error': f'Failed to fetch payment: {str(e)}'}, 500
 
     @token_required
-    def put(self, user, payment_id):
+    def patch(self, user, payment_id):
         """Update payment status (typically called by payment webhook or admin)"""
         try:
             payment = Payment.query.get(payment_id)

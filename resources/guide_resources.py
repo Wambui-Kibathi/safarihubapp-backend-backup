@@ -198,7 +198,7 @@ class GuideDetail(Resource):
             return {'error': f'Failed to fetch guide: {str(e)}'}, 500
 
     @token_required
-    def put(self, user, guide_id):
+    def patch(self, user, guide_id):
         """Update guide profile (guide owner or admin only)"""
         try:
             guide = Guide.query.get(guide_id)

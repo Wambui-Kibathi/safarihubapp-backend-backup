@@ -83,6 +83,12 @@ class DestinationList(Resource):
             parser.add_argument('description', type=str)
             parser.add_argument('category', type=str, required=True, help='Category is required',
                               choices=['popular', 'international'])
+            parser.add_argument('guide_id', type=int)
+            parser.add_argument('duration_days', type=int)
+            parser.add_argument('included_amenities', type=str)  # JSON string
+            parser.add_argument('itinerary', type=str)
+            parser.add_argument('max_travelers', type=int)
+            parser.add_argument('images', type=str)  # JSON string
             args = parser.parse_args()
 
             # Check if destination with same name already exists
@@ -97,7 +103,13 @@ class DestinationList(Resource):
                 price=args['price'],
                 image_url=args['image_url'],
                 description=args.get('description'),
-                category=args['category']
+                category=args['category'],
+                guide_id=args.get('guide_id'),
+                duration_days=args.get('duration_days'),
+                included_amenities=args.get('included_amenities'),
+                itinerary=args.get('itinerary'),
+                max_travelers=args.get('max_travelers'),
+                images=args.get('images')
             )
 
             db.session.add(new_destination)
@@ -116,13 +128,43 @@ class DestinationList(Resource):
 
 class DestinationDetail(Resource):
     def get(self, destination_id):
-        """Get specific destination (public access)"""
+        """Get specific destination with comprehensive data (public access)"""
         try:
             destination = Destination.query.get(destination_id)
             if not destination:
                 raise NotFoundError('Destination not found')
 
-            return {'destination': destination_schema.dump(destination)}, 200
+            # Get comprehensive destination data
+            destination_data = destination_schema.dump(destination)
+
+            # Add assigned guide information if exists
+            if destination.assigned_guide:
+                guide_user = destination.assigned_guide.user
+                destination_data['assigned_guide'] = {
+                    'id': destination.assigned_guide.id,
+                    'full_name': guide_user.full_name if guide_user else 'Unknown',
+                    'email': guide_user.email if guide_user else 'Unknown',
+                    'bio': destination.assigned_guide.bio,
+                    'languages': destination.assigned_guide.languages,
+                    'experience_years': destination.assigned_guide.experience_years,
+                    'hourly_rate': destination.assigned_guide.hourly_rate
+                }
+
+            # Parse JSON fields
+            import json
+            if destination.included_amenities:
+                try:
+                    destination_data['included_amenities'] = json.loads(destination.included_amenities)
+                except:
+                    destination_data['included_amenities'] = []
+
+            if destination.images:
+                try:
+                    destination_data['images'] = json.loads(destination.images)
+                except:
+                    destination_data['images'] = []
+
+            return {'destination': destination_data}, 200
 
         except NotFoundError as e:
             return {'error': str(e)}, 404
@@ -130,7 +172,7 @@ class DestinationDetail(Resource):
             return {'error': f'Failed to fetch destination: {str(e)}'}, 500
 
     @role_required('admin')
-    def put(self, user, destination_id):
+    def patch(self, user, destination_id):
         """Update destination (admin only)"""
         try:
             destination = Destination.query.get(destination_id)
@@ -144,6 +186,12 @@ class DestinationDetail(Resource):
             parser.add_argument('image_url', type=str)
             parser.add_argument('description', type=str)
             parser.add_argument('category', type=str, choices=['popular', 'international'])
+            parser.add_argument('guide_id', type=int)
+            parser.add_argument('duration_days', type=int)
+            parser.add_argument('included_amenities', type=str)  # JSON string
+            parser.add_argument('itinerary', type=str)
+            parser.add_argument('max_travelers', type=int)
+            parser.add_argument('images', type=str)  # JSON string
             args = parser.parse_args()
 
             # Update fields if provided
@@ -166,6 +214,18 @@ class DestinationDetail(Resource):
                 destination.description = args['description']
             if args.get('category'):
                 destination.category = args['category']
+            if args.get('guide_id') is not None:
+                destination.guide_id = args['guide_id']
+            if args.get('duration_days') is not None:
+                destination.duration_days = args['duration_days']
+            if args.get('included_amenities') is not None:
+                destination.included_amenities = args['included_amenities']
+            if args.get('itinerary') is not None:
+                destination.itinerary = args['itinerary']
+            if args.get('max_travelers') is not None:
+                destination.max_travelers = args['max_travelers']
+            if args.get('images') is not None:
+                destination.images = args['images']
 
             db.session.commit()
 

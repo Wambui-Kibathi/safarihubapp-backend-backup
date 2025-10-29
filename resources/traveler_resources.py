@@ -181,7 +181,7 @@ class TravelerDetail(Resource):
             return {'error': f'Failed to fetch traveler: {str(e)}'}, 500
 
     @token_required
-    def put(self, user, traveler_id):
+    def patch(self, user, traveler_id):
         """Update traveler profile (traveler owner or admin only)"""
         try:
             traveler = Traveler.query.get(traveler_id)

@@ -135,3 +135,6 @@ class PayStackService:
                 'success': False,
                 'message': f'Error initiating transfer: {str(e)}'
             }
+
+# Singleton instance
+paystack_service = PayStackService()

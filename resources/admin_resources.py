@@ -128,7 +128,7 @@ class AdminUsers(Resource):
 
 class AdminUserUpdate(Resource):
     @role_required('admin')
-    def put(self, user, user_id):
+    def patch(self, user, user_id):
         try:
             target_user = User.query.get(user_id)
             if not target_user:

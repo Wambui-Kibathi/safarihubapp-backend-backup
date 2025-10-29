@@ -19,7 +19,7 @@ def create_app():
     CORS(app, resources={
         r"/api/*": {
             "origins": ["http://localhost:5173", "http://localhost:3000"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "x-access-token"]
         }
     })
@@ -39,10 +39,12 @@ def create_app():
     from routes.auth_routes import auth_bp
     from routes.contact_routes import contact_bp
     from routes.upload_routes import upload_bp
+    from routes.paystack_webhook import paystack_bp
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(contact_bp, url_prefix="/api")
     app.register_blueprint(upload_bp, url_prefix="/api")
+    app.register_blueprint(paystack_bp)
 
     # Register Flask-RESTful resources
     from resources.auth_resources import UserRegistration, UserLogin, UserProfile
@@ -50,7 +52,7 @@ def create_app():
     from resources.guide_resources import GuideList, GuideDetail
     from resources.booking_resources import BookingList, BookingDetail
     from resources.destination_resources import DestinationList, DestinationDetail
-    from resources.payment_resources import PaymentList, PaymentDetail, PaymentVerify
+    from resources.payment_resources import PaymentList, PaymentDetail
     from resources.admin_resources import AdminDashboard, AdminUsers
 
     # API routes with Flask-RESTful
@@ -72,7 +74,6 @@ def create_app():
     
     api.add_resource(PaymentList, '/api/payments')
     api.add_resource(PaymentDetail, '/api/payments/<int:payment_id>')
-    api.add_resource(PaymentVerify, '/api/payments/verify')
     
     api.add_resource(AdminDashboard, '/api/admin/dashboard')
     api.add_resource(AdminUsers, '/api/admin/users')
