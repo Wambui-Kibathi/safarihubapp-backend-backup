@@ -1,43 +1,71 @@
-# routes/upload_routes.py
 from flask import Blueprint, request, jsonify
-import cloudinary
-import cloudinary.uploader
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+from utils.cloudinary_service import upload_to_cloudinary
+from utils.db import db
+from models.user import User
+from utils.jwt_service import token_required
 
 upload_bp = Blueprint('upload_bp', __name__)
 
-# Configure Cloudinary
-cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET")
-)
-
-# Profile image upload route
-@upload_bp.route("/upload/profile", methods=["POST"], strict_slashes=False)
-def upload_profile_image():
+@upload_bp.route("/upload/profile", methods=["POST"])
+@token_required
+def upload_profile_image(current_user):
     try:
         if 'image' not in request.files:
             return jsonify({"error": "No image file provided"}), 400
 
-        image = request.files['image']
+        image_file = request.files['image']
+        
+        if image_file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
 
         # Upload to Cloudinary
-        upload_result = cloudinary.uploader.upload(
-            image,
-            folder="SafariHub/profile_pictures",  # creates a folder in your Cloudinary account
-            transformation=[
-                {"width": 500, "height": 500, "crop": "fill", "gravity": "face"}  # crop around face
-            ]
+        upload_result = upload_to_cloudinary(
+            image_file, 
+            folder="safarihub/profile_pictures"
         )
 
-        image_url = upload_result.get("secure_url")
+        if not upload_result["success"]:
+            return jsonify({"error": upload_result["error"]}), 500
+
+        # Update user profile in database
+        current_user.profile_image_url = upload_result["url"]
+        db.session.commit()
+
         return jsonify({
-            "message": "Image uploaded successfully",
-            "url": image_url
+            "message": "Profile image uploaded successfully",
+            "image_url": upload_result["url"]
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@upload_bp.route("/upload/destination", methods=["POST"])
+@token_required
+def upload_destination_image(current_user):
+    try:
+        if current_user.role != 'admin':
+            return jsonify({"error": "Admin access required"}), 403
+
+        if 'image' not in request.files:
+            return jsonify({"error": "No image file provided"}), 400
+
+        image_file = request.files['image']
+        
+        if image_file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+
+        upload_result = upload_to_cloudinary(
+            image_file, 
+            folder="safarihub/destinations"
+        )
+
+        if not upload_result["success"]:
+            return jsonify({"error": upload_result["error"]}), 500
+
+        return jsonify({
+            "message": "Destination image uploaded successfully",
+            "image_url": upload_result["url"]
         }), 200
 
     except Exception as e:

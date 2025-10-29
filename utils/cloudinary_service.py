@@ -1,38 +1,35 @@
-# utils/cloudinary_service.py
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
 from flask import current_app
+import os
 
-def configure_cloudinary(app=None):
-    # If app provided, read from its config; otherwise rely on env vars
-    if app is not None:
-        cloudinary.config(
-            cloud_name=app.config.get("CLOUDINARY_CLOUD_NAME"),
-            api_key=app.config.get("CLOUDINARY_API_KEY"),
-            api_secret=app.config.get("CLOUDINARY_API_SECRET"),
-            secure=True
+def configure_cloudinary(app):
+    """Configure Cloudinary with the app context"""
+    cloudinary.config(
+        cloud_name=app.config.get("CLOUDINARY_CLOUD_NAME") or os.getenv("CLOUDINARY_CLOUD_NAME"),
+        api_key=app.config.get("CLOUDINARY_API_KEY") or os.getenv("CLOUDINARY_API_KEY"),
+        api_secret=app.config.get("CLOUDINARY_API_SECRET") or os.getenv("CLOUDINARY_API_SECRET"),
+        secure=True
+    )
+
+def upload_to_cloudinary(file, folder="safarihub"):
+    """Upload file to Cloudinary and return URL"""
+    try:
+        upload_result = cloudinary.uploader.upload(
+            file,
+            folder=folder,
+            use_filename=True,
+            unique_filename=True,
+            overwrite=False
         )
-    else:
-        # If not provided, cloudinary reads from env vars
-        cloudinary.config(secure=True)
-
-
-def upload_file(file_stream, folder="safarihub", public_id=None, use_filename=True):
-    """
-    Upload a file-like object (werkzeug FileStorage) or file path.
-    Returns the upload response dict from Cloudinary.
-    """
-    # Note: file_stream can be request.files['file'] (a FileStorage)
-    kwargs = {
-        "folder": folder,
-        "use_filename": use_filename,
-        "unique_filename": True,
-        "overwrite": False
-    }
-    if public_id:
-        kwargs["public_id"] = public_id
-        kwargs["overwrite"] = True
-
-    result = cloudinary.uploader.upload(file_stream, **kwargs)
-    return result  # contains 'secure_url', 'public_id', etc.
+        return {
+            "success": True,
+            "url": upload_result.get("secure_url"),
+            "public_id": upload_result.get("public_id")
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
