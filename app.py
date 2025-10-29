@@ -50,8 +50,8 @@ def create_app():
     from resources.guide_resources import GuideList, GuideDetail
     from resources.booking_resources import BookingList, BookingDetail
     from resources.destination_resources import DestinationList, DestinationDetail
-    from resources.payment_resources import PaymentList, PaymentDetail
-    from resources.admin_resources import AdminDashboard, UserManagement
+    from resources.payment_resources import PaymentVerify
+    from resources.admin_resources import AdminDashboard, AdminUsers
 
     # API routes with Flask-RESTful
     api.add_resource(UserRegistration, '/api/auth/register')
@@ -70,11 +70,10 @@ def create_app():
     api.add_resource(DestinationList, '/api/destinations')
     api.add_resource(DestinationDetail, '/api/destinations/<int:destination_id>')
     
-    api.add_resource(PaymentList, '/api/payments')
-    api.add_resource(PaymentDetail, '/api/payments/<int:payment_id>')
+    api.add_resource(PaymentVerify, '/api/payments/verify')
     
     api.add_resource(AdminDashboard, '/api/admin/dashboard')
-    api.add_resource(UserManagement, '/api/admin/users')
+    api.add_resource(AdminUsers, '/api/admin/users')
 
     @app.route('/')
     def index():

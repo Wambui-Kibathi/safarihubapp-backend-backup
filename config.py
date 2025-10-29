@@ -10,9 +10,6 @@ class Config:
     CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
     CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
 
-    # Stripe & M-Pesa Keys
-    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-    STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
-    MPESA_CONSUMER_KEY = os.getenv("MPESA_CONSUMER_KEY", "")
-    MPESA_CONSUMER_SECRET = os.getenv("MPESA_CONSUMER_SECRET", "")
-    MPESA_SHORTCODE = os.getenv("MPESA_SHORTCODE", "")
+    # PayStack Configuration
+    PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
+    PAYSTACK_PUBLIC_KEY = os.getenv("PAYSTACK_PUBLIC_KEY")

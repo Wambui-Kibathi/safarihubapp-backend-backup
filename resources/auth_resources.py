@@ -1,11 +1,10 @@
 from flask_restful import Resource, reqparse
-from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask import request
 from models.user import User
 from models.traveler import Traveler
 from models.guide import Guide
 from utils.db import db
-from utils.jwt_service import create_tokens
+from utils.jwt_service import create_token, token_required
 from schemas import UserSchema, TravelerSchema, GuideSchema
 
 user_schema = UserSchema()
@@ -48,13 +47,13 @@ class UserRegistration(Resource):
 
             db.session.commit()
 
-            # Generate tokens
-            tokens = create_tokens(new_user.id)
+            # Generate token
+            token = create_token(new_user.id, new_user.role)
 
             return {
                 'message': 'User registered successfully',
                 'user': user_schema.dump(new_user),
-                'tokens': tokens
+                'token': token
             }, 201
 
         except Exception as e:
@@ -74,8 +73,8 @@ class UserLogin(Resource):
             if not user or not user.check_password(args['password']):
                 return {'message': 'Invalid email or password'}, 401
 
-            # Generate tokens
-            tokens = create_tokens(user.id)
+            # Generate token
+            token = create_token(user.id, user.role)
 
             # Get role-specific data
             user_data = user_schema.dump(user)
@@ -91,17 +90,17 @@ class UserLogin(Resource):
             return {
                 'message': 'Login successful',
                 'user': user_data,
-                'tokens': tokens
+                'token': token
             }, 200
 
         except Exception as e:
             return {'message': f'Login failed: {str(e)}'}, 500
 
 class UserProfile(Resource):
-    @jwt_required()
-    def get(self):
+    @token_required
+    def get(self, user):
         try:
-            user_id = get_jwt_identity()
+            user_id = user.id
             user = User.query.get(user_id)
             
             if not user:

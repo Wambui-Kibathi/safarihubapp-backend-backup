@@ -8,12 +8,13 @@ from models.user import User
 from models.traveler import Traveler
 from schemas import PaymentSchema, BookingSchema
 from utils.jwt_service import token_required
-from utils.paystack_service import paystack_service
+from utils.paystack_service import PayStackService  # Updated import
 from utils.error_handlers import ValidationError, NotFoundError, UnauthorizedError
 import uuid
 
 payment_schema = PaymentSchema()
 booking_schema = BookingSchema()
+paystack_service = PayStackService()  # Initialize PayStack service
 
 class PaymentList(Resource):
     @token_required
@@ -79,16 +80,16 @@ class PaymentList(Resource):
 
     @token_required
     def post(self, user):
-        """Create payment record and initiate payment"""
+        """Create payment record and initiate PayStack payment"""
         try:
             if user.role != 'traveler':
                 raise UnauthorizedError('Only travelers can initiate payments')
 
             parser = reqparse.RequestParser()
             parser.add_argument('booking_id', type=int, required=True, help='Booking ID is required')
-            parser.add_argument('payment_method', type=str, required=True,
-                              choices=['paystack', 'stripe', 'mpesa'], help='Payment method is required')
             parser.add_argument('amount', type=float, required=True, help='Amount is required')
+            parser.add_argument('callback_url', type=str, required=False, 
+                              default='http://localhost:5173/payment/verify')  # Frontend verification URL
             args = parser.parse_args()
 
             # Validate booking exists and belongs to user
@@ -97,7 +98,10 @@ class PaymentList(Resource):
                 raise NotFoundError('Booking not found')
 
             traveler = Traveler.query.filter_by(user_id=user.id).first()
-            if not booking.traveler_id == traveler.id:
+            if not traveler:
+                raise NotFoundError('Traveler profile not found')
+                
+            if booking.traveler_id != traveler.id:
                 raise UnauthorizedError('Access denied')
 
             # Check if booking already has a completed payment
@@ -108,13 +112,13 @@ class PaymentList(Resource):
                 return {'error': 'Booking already has a completed payment'}, 409
 
             # Generate transaction ID
-            transaction_id = str(uuid.uuid4())
+            transaction_id = f"booking_{booking.id}_{uuid.uuid4().hex[:8]}"
 
             # Create payment record
             new_payment = Payment(
                 booking_id=booking.id,
                 amount=args['amount'],
-                method=args['payment_method'],
+                payment_method='paystack',  # Fixed field name from 'method' to 'payment_method'
                 status='pending',
                 transaction_id=transaction_id
             )
@@ -122,33 +126,31 @@ class PaymentList(Resource):
             db.session.add(new_payment)
             db.session.commit()
 
-            # Initialize payment with PayStack (assuming PayStack is the primary method)
-            if args['payment_method'] == 'paystack':
-                payment_result = paystack_service.initialize_transaction(
-                    email=user.email,
-                    amount=args['amount'],
-                    reference=transaction_id,
-                    metadata={'booking_id': booking.id, 'payment_id': new_payment.id}
-                )
+            # Initialize payment with PayStack
+            payment_result = paystack_service.initialize_transaction(
+                email=user.email,
+                amount=args['amount'],
+                reference=transaction_id,
+                callback_url=args['callback_url']
+            )
 
-                if payment_result['success']:
-                    return {
-                        'message': 'Payment initialized successfully',
-                        'payment': self._serialize_payment(new_payment),
-                        'payment_url': payment_result['authorization_url'],
-                        'reference': payment_result['reference']
-                    }, 201
-                else:
-                    # Update payment status to failed
-                    new_payment.status = 'failed'
-                    db.session.commit()
-                    return {'error': f'Payment initialization failed: {payment_result["error"]}'}, 500
-
-            # For other payment methods, just create the record
-            return {
-                'message': 'Payment record created successfully',
-                'payment': self._serialize_payment(new_payment)
-            }, 201
+            if payment_result['success']:
+                # Update payment with PayStack reference
+                new_payment.transaction_id = payment_result['reference']  # Use PayStack reference
+                db.session.commit()
+                
+                return {
+                    'message': 'Payment initialized successfully',
+                    'payment': self._serialize_payment(new_payment),
+                    'authorization_url': payment_result['authorization_url'],
+                    'reference': payment_result['reference'],
+                    'access_code': payment_result.get('access_code', '')
+                }, 201
+            else:
+                # Update payment status to failed
+                new_payment.status = 'failed'
+                db.session.commit()
+                return {'error': f'Payment initialization failed: {payment_result.get("message", "Unknown error")}'}, 500
 
         except ValidationError as e:
             return {'error': str(e)}, 400
@@ -235,6 +237,64 @@ class PaymentDetail(Resource):
             db.session.rollback()
             return {'error': f'Failed to update payment: {str(e)}'}, 500
 
+class PaymentVerify(Resource):
+    """Resource for verifying PayStack payments (webhook or manual verification)"""
+    
+    def post(self):
+        """Verify PayStack payment (webhook endpoint)"""
+        try:
+            # For webhook, PayStack sends the data in the request
+            if request.is_json:
+                data = request.get_json()
+                reference = data.get('data', {}).get('reference')
+            else:
+                # For manual verification
+                parser = reqparse.RequestParser()
+                parser.add_argument('reference', type=str, required=True, help='Reference is required')
+                args = parser.parse_args()
+                reference = args['reference']
+
+            if not reference:
+                return {'error': 'Reference is required'}, 400
+
+            # Verify transaction with PayStack
+            verification_result = paystack_service.verify_transaction(reference)
+            
+            if verification_result['success']:
+                # Find payment by PayStack reference
+                payment = Payment.query.filter_by(transaction_id=reference).first()
+                if not payment:
+                    return {'error': 'Payment not found'}, 404
+
+                # Update payment status based on PayStack response
+                paystack_status = verification_result['data']['status']
+                if paystack_status == 'success':
+                    payment.status = 'completed'
+                    
+                    # Update booking status
+                    booking = Booking.query.get(payment.booking_id)
+                    if booking and booking.status == 'pending':
+                        booking.status = 'confirmed'
+                        db.session.add(booking)
+                        
+                    message = 'Payment verified successfully'
+                else:
+                    payment.status = 'failed'
+                    message = f'Payment failed: {paystack_status}'
+
+                db.session.commit()
+
+                return {
+                    'message': message,
+                    'payment': payment_schema.dump(payment),
+                    'paystack_status': paystack_status
+                }, 200
+            else:
+                return {'error': f'Payment verification failed: {verification_result.get("message", "Unknown error")}'}, 400
+
+        except Exception as e:
+            return {'error': f'Payment verification failed: {str(e)}'}, 500
+
     def _can_access_payment(self, user, payment):
         """Check if user can access this payment"""
         if user.role == 'admin':
@@ -267,8 +327,10 @@ class PaymentDetail(Resource):
 
             booking_data = {
                 'id': booking.id,
-                'date': booking.date.isoformat() if booking.date else None,
-                'status': booking.status
+                'start_date': booking.start_date.isoformat() if booking.start_date else None,
+                'end_date': booking.end_date.isoformat() if booking.end_date else None,
+                'status': booking.status,
+                'total_price': booking.total_price
             }
 
             # Add destination info
@@ -277,8 +339,8 @@ class PaymentDetail(Resource):
                 booking_data['destination'] = {
                     'id': destination.id,
                     'name': destination.name,
-                    'country': destination.country,
-                    'price': destination.price
+                    'location': destination.location,
+                    'price_per_day': destination.price_per_day
                 }
 
             # Add guide info
@@ -288,7 +350,8 @@ class PaymentDetail(Resource):
                     guide_user = User.query.get(guide.user_id)
                     booking_data['guide'] = {
                         'id': guide.id,
-                        'full_name': guide_user.full_name if guide_user else 'Unknown'
+                        'full_name': guide_user.full_name if guide_user else 'Unknown',
+                        'specialties': guide.specialties
                     }
 
             payment_data['booking'] = booking_data
