@@ -24,7 +24,7 @@ class UserRegistration(Resource):
             # Check if user already exists
             existing_user = User.query.filter_by(email=args['email']).first()
             if existing_user:
-                return {'message': 'User with this email already exists'}, 400
+                return {'success': False, 'message': 'User with this email already exists'}, 400
 
             # Create new user
             new_user = User(
@@ -51,14 +51,20 @@ class UserRegistration(Resource):
             token = create_token(new_user.id, new_user.role)
 
             return {
+                'success': True,
                 'message': 'User registered successfully',
-                'user': user_schema.dump(new_user),
+                'user': {
+                    'id': new_user.id,
+                    'full_name': new_user.full_name,
+                    'email': new_user.email,
+                    'role': new_user.role
+                },
                 'token': token
             }, 201
 
         except Exception as e:
             db.session.rollback()
-            return {'message': f'Registration failed: {str(e)}'}, 500
+            return {'success': False, 'message': f'Registration failed: {str(e)}'}, 500
 
 class UserLogin(Resource):
     def post(self):
@@ -71,7 +77,7 @@ class UserLogin(Resource):
             user = User.query.filter_by(email=args['email']).first()
 
             if not user or not user.check_password(args['password']):
-                return {'message': 'Invalid email or password'}, 401
+                return {'success': False, 'message': 'Invalid email or password'}, 401
 
             # Generate token
             token = create_token(user.id, user.role)
@@ -88,13 +94,19 @@ class UserLogin(Resource):
                     user_data['guide_profile'] = guide_schema.dump(guide)
 
             return {
+                'success': True,
                 'message': 'Login successful',
-                'user': user_data,
+                'user': {
+                    'id': user.id,
+                    'full_name': user.full_name,
+                    'email': user.email,
+                    'role': user.role
+                },
                 'token': token
             }, 200
 
         except Exception as e:
-            return {'message': f'Login failed: {str(e)}'}, 500
+            return {'success': False, 'message': f'Login failed: {str(e)}'}, 500
 
 class UserProfile(Resource):
     @token_required
@@ -104,7 +116,7 @@ class UserProfile(Resource):
             user = User.query.get(user_id)
             
             if not user:
-                return {'message': 'User not found'}, 404
+                return {'success': False, 'message': 'User not found'}, 404
 
             user_data = user_schema.dump(user)
             
@@ -121,4 +133,4 @@ class UserProfile(Resource):
             return {'user': user_data}, 200
 
         except Exception as e:
-            return {'message': f'Failed to fetch profile: {str(e)}'}, 500
+            return {'success': False, 'message': f'Failed to fetch profile: {str(e)}'}, 500

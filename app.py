@@ -36,12 +36,10 @@ def create_app():
     register_error_handlers(app)
 
     # Import and register blueprints (keep for non-RESTful routes if needed)
-    from routes.auth_routes import auth_bp
     from routes.contact_routes import contact_bp
     from routes.upload_routes import upload_bp
     from routes.paystack_webhook import paystack_bp
 
-    app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(contact_bp, url_prefix="/api")
     app.register_blueprint(upload_bp, url_prefix="/api")
     app.register_blueprint(paystack_bp)
