@@ -57,6 +57,12 @@ def role_required(required_role):
             data = decode_token(token)
             if not data or data.get("role") != required_role:
                 return jsonify({"error": "Unauthorized access"}), 403
-            return f(*args, **kwargs)
+            
+            from models.user import User
+            user = User.query.get(data.get("user_id"))
+            if not user:
+                return jsonify({"error": "User not found"}), 401
+
+            return f(user, *args, **kwargs)
         return decorated
     return decorator
