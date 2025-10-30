@@ -36,27 +36,23 @@ def create_app():
     register_error_handlers(app)
 
     # Import and register blueprints (keep for non-RESTful routes if needed)
+    from routes.auth_routes import auth_bp
     from routes.contact_routes import contact_bp
     from routes.upload_routes import upload_bp
     from routes.paystack_webhook import paystack_bp
 
+    app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(contact_bp, url_prefix="/api")
     app.register_blueprint(upload_bp, url_prefix="/api")
     app.register_blueprint(paystack_bp)
 
     # Register Flask-RESTful resources
-    from resources.auth_resources import UserRegistration, UserLogin, UserProfile
     from resources.traveler_resources import TravelerList, TravelerDetail
     from resources.guide_resources import GuideList, GuideDetail
     from resources.booking_resources import BookingList, BookingDetail
     from resources.destination_resources import DestinationList, DestinationDetail
     from resources.payment_resources import PaymentList, PaymentDetail
     from resources.admin_resources import AdminDashboard, AdminUsers
-
-    # API routes with Flask-RESTful
-    api.add_resource(UserRegistration, '/api/auth/register')
-    api.add_resource(UserLogin, '/api/auth/login')
-    api.add_resource(UserProfile, '/api/auth/profile')
     
     api.add_resource(TravelerList, '/api/travelers')
     api.add_resource(TravelerDetail, '/api/travelers/<int:traveler_id>')

@@ -1,5 +1,5 @@
 from flask_restful import Resource, reqparse
-from flask import request
+from flask import request, g
 from models.user import User
 from models.traveler import Traveler
 from models.guide import Guide
@@ -110,17 +110,19 @@ class UserLogin(Resource):
 
 class UserProfile(Resource):
     @token_required
-    def get(self, user):
+    def get(self):
         try:
-            user_id = user.id
-            user = User.query.get(user_id)
-            
-            if not user:
-                return {'success': False, 'message': 'User not found'}, 404
+            user = g.user  # Retrieve user from Flask context
 
-            user_data = user_schema.dump(user)
-            
             # Add role-specific data
+            user_data = {
+                'id': user.id,
+                'full_name': user.full_name,
+                'email': user.email,
+                'role': user.role,
+                'profile_image_url': user.profile_image_url
+            }
+
             if user.role == 'traveler':
                 traveler = Traveler.query.filter_by(user_id=user.id).first()
                 if traveler:
@@ -130,7 +132,10 @@ class UserProfile(Resource):
                 if guide:
                     user_data['guide_profile'] = guide_schema.dump(guide)
 
-            return {'user': user_data}, 200
+            return {
+                'success': True,
+                'user': user_data
+            }, 200
 
         except Exception as e:
             return {'success': False, 'message': f'Failed to fetch profile: {str(e)}'}, 500
